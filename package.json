@@ -1,0 +1,29 @@
+{
+  "name": "mirror",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MIRROR: what happens if you choose it? A local-first decision-exploration website and app.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs && node scripts/prerender.mjs && node scripts/vercel-output.mjs",
+    "dev": "node scripts/build.mjs --watch & node --import tsx server/dev.mjs",
+    "start": "node --import tsx server/dev.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "e2e": "node e2e/journey.mjs",
+    "check": "npm run typecheck && npm test && npm run build && npm run e2e"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.28.0",
+    "playwright": "^1.56.0",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

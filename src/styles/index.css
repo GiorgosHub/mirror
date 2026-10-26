@@ -1,0 +1,11 @@
+/* MIRROR v5 styles. Layers, lowest to highest: tokens, base, components, app, site, fx.
+   A later layer always wins over an earlier one, whatever the selector, so overrides live in the right file instead of
+   fighting specificity. See docs/design-v5.md and docs/adr-001-ui-architecture.md. */
+@layer tokens, base, components, app, site, fx;
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./base.css";
+@import "./components.css";
+@import "./app.css";
+@import "./site.css";
+@import "./fx.css";

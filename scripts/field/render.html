@@ -1,0 +1,257 @@
+<!doctype html>
+<!-- "Possibility Field": MIRROR's original motion asset, rendered frame by frame (scripts/field/render.py).
+     Every motion is periodic over T seconds, so the loop is seamless. Detail lives on the right two thirds;
+     the left third stays near-black for text. No text, logos, people, flashes or cuts. -->
+<html><body style="margin:0;background:#0B0D12">
+<canvas id="c"></canvas>
+<script>
+const W = +(new URLSearchParams(location.search).get("w") || 1280), H = +(new URLSearchParams(location.search).get("h") || 720);
+const c = document.getElementById("c"); c.width = W; c.height = H;
+const g = c.getContext("2d");
+const T = 10; // seconds per loop
+const TAU = Math.PI * 2;
+
+// deterministic randomness
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+const O = { x: 0.6 * W, y: 0.52 * H }; // the point of light, right of centre
+const PATHS = [];
+const N = 15;
+for (let i = 0; i < N; i++) {
+  const spread = (i / (N - 1)) * 2 - 1;           // -1..1
+  const ang = spread * 1.15 + (rnd() - .5) * .12;  // fan opening to the right
+  const len = (0.42 + rnd() * 0.32) * W;
+  const bend = (rnd() - .5) * 0.5;
+  const ex = O.x + Math.cos(ang) * len, ey = O.y + Math.sin(ang) * len * 0.62;
+  const c1 = { x: O.x + Math.cos(ang * .35) * len * .32, y: O.y + Math.sin(ang * .35) * len * .12 };
+  const c2 = { x: O.x + Math.cos(ang + bend) * len * .7, y: O.y + Math.sin(ang + bend) * len * .45 };
+  const hue = rnd() < .55 ? "violet" : "cyan";
+  PATHS.push({ c1, c2, e: { x: ex, y: ey }, hue, w: .6 + rnd() * 1.1, a: .22 + rnd() * .38, phase: rnd(), speed: rnd() < .5 ? 1 : 2, sway: rnd() * TAU });
+}
+// a few branches split again: paths of paths
+const SUB = [];
+for (const p of PATHS) if (rnd() < .55) {
+  const tt = .45 + rnd() * .2;
+  const s = bez(O, p.c1, p.c2, p.e, tt);
+  const ang = Math.atan2(p.e.y - s.y, p.e.x - s.x) + (rnd() < .5 ? -1 : 1) * (.25 + rnd() * .3);
+  const len = (0.18 + rnd() * .2) * W;
+  SUB.push({ s, c1: { x: s.x + Math.cos(ang) * len * .4, y: s.y + Math.sin(ang) * len * .2 }, c2: { x: s.x + Math.cos(ang) * len * .75, y: s.y + Math.sin(ang) * len * .55 }, e: { x: s.x + Math.cos(ang) * len, y: s.y + Math.sin(ang) * len * .7 }, hue: p.hue, a: p.a * .7, phase: rnd(), sway: rnd() * TAU });
+}
+const GLASS = Array.from({ length: 6 }, (_, i) => ({ x: .42 + rnd() * .55, y: .1 + rnd() * .8, w: .12 + rnd() * .22, h: .25 + rnd() * .4, skew: (rnd() - .5) * .5, depth: .3 + i * .12, phase: rnd() * TAU, a: .025 + rnd() * .03 }));
+const DUST = Array.from({ length: 260 }, () => ({ x: .3 + rnd() * .75, y: rnd(), r: .3 + rnd() * 1.1, a: .08 + rnd() * .35, ax: 4 + rnd() * 14, ay: 3 + rnd() * 10, ph: rnd() * TAU, k: rnd() < .5 ? 1 : 2 }));
+
+function bez(a, b, cc, d, t) {
+  const u = 1 - t;
+  return { x: u*u*u*a.x + 3*u*u*t*b.x + 3*u*t*t*cc.x + t*t*t*d.x, y: u*u*u*a.y + 3*u*u*t*b.y + 3*u*t*t*cc.y + t*t*t*d.y };
+}
+const COL = { violet: [155, 140, 255], cyan: [120, 229, 210] };
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+function frame(t) { // t in [0,T)
+  const ph = (t / T) * TAU;
+  // camera: slow periodic drift and breathing zoom
+  const cx = Math.sin(ph) * W * .012, cy = Math.cos(ph) * H * .01, z = 1 + Math.sin(ph) * .018;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = "source-over";
+  g.fillStyle = "#0B0D12"; g.fillRect(0, 0, W, H);
+  // atmosphere
+  let rg = g.createRadialGradient(O.x, O.y, 0, O.x, O.y, W * .62);
+  rg.addColorStop(0, "rgba(155,140,255,.16)"); rg.addColorStop(.35, "rgba(70,66,140,.07)"); rg.addColorStop(1, "rgba(11,13,18,0)");
+  g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  rg = g.createRadialGradient(W * .9, H * .15, 0, W * .9, H * .15, W * .4);
+  rg.addColorStop(0, "rgba(120,229,210,.06)"); rg.addColorStop(1, "rgba(11,13,18,0)");
+  g.fillStyle = rg; g.fillRect(0, 0, W, H);
+
+  g.translate(O.x + cx, O.y + cy); g.scale(z, z); g.translate(-O.x, -O.y);
+
+  // smoked-glass planes, parallax by depth
+  for (const p of GLASS) {
+    const dx = Math.sin(ph + p.phase) * 18 * p.depth, dy = Math.cos(ph + p.phase) * 10 * p.depth;
+    const x = p.x * W + dx, y = p.y * H + dy, w = p.w * W, h = p.h * H;
+    g.save(); g.translate(x, y); g.transform(1, p.skew * .3, p.skew, 1, 0, 0);
+    const lg = g.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+    lg.addColorStop(0, `rgba(190,195,230,${p.a * 1.6})`); lg.addColorStop(.5, `rgba(120,125,170,${p.a * .5})`); lg.addColorStop(1, `rgba(190,195,230,${p.a})`);
+    g.globalAlpha = .55;
+    g.fillStyle = lg; g.fillRect(-w / 2, -h / 2, w, h);
+    g.globalAlpha = 1;
+    /* only the edges that catch the light: top and leading side, fading out */
+    const eg = g.createLinearGradient(-w / 2, -h / 2, w / 2, -h / 2);
+    eg.addColorStop(0, `rgba(230,232,255,${p.a * 3})`); eg.addColorStop(1, "rgba(230,232,255,0)");
+    g.strokeStyle = eg; g.lineWidth = .7;
+    g.beginPath(); g.moveTo(w / 2, -h / 2); g.lineTo(-w / 2, -h / 2); g.stroke();
+    const sg = g.createLinearGradient(0, -h / 2, 0, h / 2);
+    sg.addColorStop(0, `rgba(230,232,255,${p.a * 2.4})`); sg.addColorStop(1, "rgba(230,232,255,0)");
+    g.strokeStyle = sg; g.beginPath(); g.moveTo(-w / 2, -h / 2); g.lineTo(-w / 2, h / 2); g.stroke();
+    // a moving reflection across the glass
+    const rx = ((Math.sin(ph + p.phase) + 1) / 2) * w - w / 2;
+    const rl = g.createLinearGradient(rx - 40, 0, rx + 40, 0);
+    rl.addColorStop(0, "rgba(255,255,255,0)"); rl.addColorStop(.5, `rgba(255,255,255,${p.a * 1.4})`); rl.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = rl; g.fillRect(-w / 2, -h / 2, w, h);
+    g.restore();
+  }
+
+  g.globalCompositeOperation = "lighter";
+  const sway = (p) => Math.sin(ph + p.sway) * 6;
+  const drawPath = (from, p, width, alpha) => {
+    const s1 = sway(p);
+    const c1 = { x: p.c1.x, y: p.c1.y + s1 * .5 }, c2 = { x: p.c2.x, y: p.c2.y + s1 }, e = { x: p.e.x, y: p.e.y + s1 * 1.4 };
+    const lg = g.createLinearGradient(from.x, from.y, e.x, e.y);
+    lg.addColorStop(0, `rgba(243,244,248,${alpha})`); lg.addColorStop(.35, rgba(COL[p.hue], alpha * .9)); lg.addColorStop(1, rgba(COL[p.hue], 0));
+    g.strokeStyle = lg; g.lineWidth = width; g.shadowColor = rgba(COL[p.hue], .6); g.shadowBlur = 8;
+    g.beginPath(); g.moveTo(from.x, from.y); g.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, e.x, e.y); g.stroke();
+    g.shadowBlur = 0;
+    // light travelling along the path (periodic: integer cycles per loop)
+    for (let k = 0; k < 2; k++) {
+      const u = ((t / T) * (p.speed || 1) + p.phase + k * .5) % 1;
+      const q = bez(from, c1, c2, e, u);
+      const fade = Math.sin(u * Math.PI) * alpha * 1.6;
+      const gr = g.createRadialGradient(q.x, q.y, 0, q.x, q.y, 10);
+      gr.addColorStop(0, `rgba(255,255,255,${fade})`); gr.addColorStop(.4, rgba(COL[p.hue], fade * .6)); gr.addColorStop(1, rgba(COL[p.hue], 0));
+      g.fillStyle = gr; g.beginPath(); g.arc(q.x, q.y, 10, 0, TAU); g.fill();
+    }
+  };
+  for (const p of PATHS) drawPath(O, p, p.w, p.a);
+  for (const p of SUB) drawPath(p.s, { ...p, speed: 1 }, .6, p.a);
+
+  // dust
+  for (const d of DUST) {
+    const x = d.x * W + Math.sin(ph * d.k + d.ph) * d.ax, y = d.y * H + Math.cos(ph + d.ph) * d.ay;
+    const tw = .6 + .4 * Math.sin(ph * 2 + d.ph);
+    g.fillStyle = `rgba(220,224,255,${d.a * tw})`; g.beginPath(); g.arc(x, y, d.r, 0, TAU); g.fill();
+  }
+
+  // the point of light
+  const pulse = 1 + Math.sin(ph * 2) * .06;
+  rg = g.createRadialGradient(O.x, O.y, 0, O.x, O.y, 120 * pulse);
+  rg.addColorStop(0, "rgba(255,255,255,.95)"); rg.addColorStop(.05, "rgba(243,244,248,.75)"); rg.addColorStop(.18, "rgba(190,180,255,.22)"); rg.addColorStop(1, "rgba(155,140,255,0)");
+  g.fillStyle = rg; g.beginPath(); g.arc(O.x, O.y, 120 * pulse, 0, TAU); g.fill();
+  g.fillStyle = "#fff"; g.beginPath(); g.arc(O.x, O.y, 3.2, 0, TAU); g.fill();
+  // horizontal anamorphic streak, restrained
+  const st = g.createLinearGradient(O.x - 260, 0, O.x + 260, 0);
+  st.addColorStop(0, "rgba(155,140,255,0)"); st.addColorStop(.5, "rgba(230,228,255,.22)"); st.addColorStop(1, "rgba(120,229,210,0)");
+  g.fillStyle = st; g.fillRect(O.x - 260, O.y - .8, 520, 1.6);
+
+  // keep the left third dark for text, and vignette
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "source-over";
+  const lv = g.createLinearGradient(0, 0, W * .5, 0);
+  lv.addColorStop(0, "rgba(11,13,18,.92)"); lv.addColorStop(1, "rgba(11,13,18,0)");
+  g.fillStyle = lv; g.fillRect(0, 0, W * .5, H);
+  const vg = g.createRadialGradient(W * .6, H * .5, H * .3, W * .6, H * .5, W * .8);
+  vg.addColorStop(0, "rgba(11,13,18,0)"); vg.addColorStop(1, "rgba(11,13,18,.7)");
+  g.fillStyle = vg; g.fillRect(0, 0, W, H);
+}
+/* ---------- additional scenes (placeholders for the Higgsfield films; same palette, same rules) ---------- */
+const SCENE = new URLSearchParams(location.search).get("scene") || "field";
+function base(ph) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "source-over";
+  g.fillStyle = "#0B0D12"; g.fillRect(0, 0, W, H);
+}
+function leftDark() {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "source-over";
+  const lv = g.createLinearGradient(0, 0, W * .5, 0); lv.addColorStop(0, "rgba(11,13,18,.94)"); lv.addColorStop(1, "rgba(11,13,18,0)");
+  g.fillStyle = lv; g.fillRect(0, 0, W * .5, H);
+  const vg = g.createRadialGradient(W * .62, H * .5, H * .3, W * .62, H * .5, W * .85); vg.addColorStop(0, "rgba(11,13,18,0)"); vg.addColorStop(1, "rgba(11,13,18,.72)");
+  g.fillStyle = vg; g.fillRect(0, 0, W, H);
+}
+function glowDot(x, y, r, a, col) {
+  const gr = g.createRadialGradient(x, y, 0, x, y, r);
+  gr.addColorStop(0, `rgba(255,255,255,${a})`); gr.addColorStop(.25, rgba(col, a * .5)); gr.addColorStop(1, rgba(col, 0));
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+}
+const RAYS = Array.from({ length: 34 }, () => ({ a: rnd() * TAU, hue: rnd() < .5 ? "violet" : "cyan", w: .4 + rnd() * 1, al: .1 + rnd() * .3, ph: rnd(), k: rnd() < .5 ? 1 : 2, curl: (rnd() - .5) * .6 }));
+function branch(t) { // forward glide through paths radiating from a point
+  const ph = (t / T) * TAU; base(ph);
+  const V = { x: W * .64 + Math.sin(ph) * 10, y: H * .5 + Math.cos(ph) * 6 };
+  let rg = g.createRadialGradient(V.x, V.y, 0, V.x, V.y, W * .55); rg.addColorStop(0, "rgba(155,140,255,.15)"); rg.addColorStop(1, "rgba(11,13,18,0)");
+  g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = "lighter";
+  for (const r of RAYS) {
+    const a = r.a + Math.sin(ph) * .03, L = W * 1.1;
+    const ex = V.x + Math.cos(a) * L, ey = V.y + Math.sin(a) * L * .7;
+    const cx = V.x + Math.cos(a + r.curl) * L * .4, cy = V.y + Math.sin(a + r.curl) * L * .25;
+    const lg = g.createLinearGradient(V.x, V.y, ex, ey);
+    lg.addColorStop(0, `rgba(243,244,248,${r.al})`); lg.addColorStop(.4, rgba(COL[r.hue], r.al * .7)); lg.addColorStop(1, rgba(COL[r.hue], 0));
+    g.strokeStyle = lg; g.lineWidth = r.w; g.beginPath(); g.moveTo(V.x, V.y); g.quadraticCurveTo(cx, cy, ex, ey); g.stroke();
+    for (let k = 0; k < 3; k++) { // lights travel outward = moving forward; ease-in so they accelerate toward the viewer
+      const u0 = ((t / T) * r.k + r.ph + k / 3) % 1, u = u0 * u0;
+      const q = { x: (1 - u) * (1 - u) * V.x + 2 * (1 - u) * u * cx + u * u * ex, y: (1 - u) * (1 - u) * V.y + 2 * (1 - u) * u * cy + u * u * ey };
+      glowDot(q.x, q.y, 3 + u * 16, Math.sin(u0 * Math.PI) * r.al * 1.4, COL[r.hue]);
+    }
+  }
+  glowDot(V.x, V.y, 90, .9, COL.violet); g.fillStyle = "#fff"; g.beginPath(); g.arc(V.x, V.y, 3, 0, TAU); g.fill();
+  leftDark();
+}
+function threshold(t) { // a horizon line, one point resting on it, a mirrored floor
+  const ph = (t / T) * TAU; base(ph);
+  const y = H * .56, x0 = W * .2, P = { x: W * .68, y };
+  const z = 1 + Math.sin(ph) * .012; g.translate(P.x, y); g.scale(z, z); g.translate(-P.x, -y);
+  const mist = g.createLinearGradient(0, y - H * .3, 0, y + H * .3); mist.addColorStop(0, "rgba(11,13,18,0)"); mist.addColorStop(.5, "rgba(120,110,200,.08)"); mist.addColorStop(1, "rgba(11,13,18,0)");
+  g.fillStyle = mist; g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = "lighter";
+  const line = g.createLinearGradient(x0, 0, W, 0); line.addColorStop(0, "rgba(155,140,255,0)"); line.addColorStop(.55, "rgba(230,228,255,.75)"); line.addColorStop(1, "rgba(155,140,255,.1)");
+  g.fillStyle = line; g.fillRect(x0, y - .7, W - x0, 1.4);
+  g.globalAlpha = .35; g.fillRect(x0, y - 6, W - x0, 12); g.globalAlpha = 1;
+  // reflection on the floor
+  g.save(); g.translate(P.x, y); g.scale(1, .22);
+  const refl = g.createRadialGradient(0, 0, 0, 0, 0, W * .32); refl.addColorStop(0, "rgba(155,140,255,.22)"); refl.addColorStop(1, "rgba(155,140,255,0)");
+  g.fillStyle = refl; g.beginPath(); g.arc(0, 0, W * .32, 0, Math.PI); g.fill(); g.restore();
+  const b = .75 + .25 * Math.sin(ph);
+  glowDot(P.x, y, 140 * b, .85 * b, COL.violet); glowDot(P.x, y + 22, 60 * b, .2 * b, COL.violet);
+  g.fillStyle = "#fff"; g.beginPath(); g.arc(P.x, y, 3.2, 0, TAU); g.fill();
+  for (const d of DUST) { const x = d.x * W + Math.sin(ph * d.k + d.ph) * d.ax, yy = d.y * H + Math.cos(ph + d.ph) * d.ay; g.fillStyle = `rgba(220,224,255,${d.a * .6})`; g.beginPath(); g.arc(x, yy, d.r * .8, 0, TAU); g.fill(); }
+  leftDark();
+}
+function horizon(t) { // three paths across a dark plain toward a distant horizon, lateral drift
+  const ph = (t / T) * TAU; base(ph);
+  const hy = H * .4, dx = Math.sin(ph) * W * .02;
+  const sky = g.createLinearGradient(0, 0, 0, hy); sky.addColorStop(0, "#0B0D12"); sky.addColorStop(1, "#191a33"); g.fillStyle = sky; g.fillRect(0, 0, W, hy);
+  const ground = g.createLinearGradient(0, hy, 0, H); ground.addColorStop(0, "#14152a"); ground.addColorStop(1, "#0B0D12"); g.fillStyle = ground; g.fillRect(0, hy, W, H - hy);
+  g.globalCompositeOperation = "lighter";
+  const hz = g.createLinearGradient(0, hy - 30, 0, hy + 30); hz.addColorStop(0, "rgba(155,140,255,0)"); hz.addColorStop(.5, "rgba(190,180,255,.22)"); hz.addColorStop(1, "rgba(155,140,255,0)");
+  g.fillStyle = hz; g.fillRect(0, hy - 30, W, 60);
+  // perspective grid of glass on the plain
+  for (let i = -14; i <= 14; i++) { const x = W * .6 + i * 120 + dx * 2; g.strokeStyle = "rgba(170,175,220,.05)"; g.lineWidth = 1; g.beginPath(); g.moveTo(W * .6 + dx + i * 8, hy); g.lineTo(x, H); g.stroke(); }
+  for (let j = 1; j < 9; j++) { const yy = hy + (H - hy) * Math.pow(j / 9, 2); g.strokeStyle = `rgba(170,175,220,${.02 + j * .006})`; g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke(); }
+  const S = { x: W * .66 + dx * 3, y: H * 1.02 };
+  const ends = [W * .52, W * .64, W * .8].map((x, i) => ({ x: x + dx, y: hy + 2, hue: i === 1 ? "violet" : "cyan" }));
+  ends.forEach((e, i) => {
+    const c1 = { x: S.x + (e.x - S.x) * .2 + (i - 1) * 60, y: S.y - (S.y - hy) * .45 };
+    const lg = g.createLinearGradient(S.x, S.y, e.x, e.y); lg.addColorStop(0, "rgba(243,244,248,.55)"); lg.addColorStop(1, rgba(COL[e.hue], .15));
+    g.strokeStyle = lg; g.lineWidth = 1.6 - i * .2; g.beginPath(); g.moveTo(S.x, S.y); g.quadraticCurveTo(c1.x, c1.y, e.x, e.y); g.stroke();
+    for (let k = 0; k < 2; k++) { const u = ((t / T) + i * .21 + k * .5) % 1, uu = Math.sqrt(u);
+      const q = { x: (1 - uu) * (1 - uu) * S.x + 2 * (1 - uu) * uu * c1.x + uu * uu * e.x, y: (1 - uu) * (1 - uu) * S.y + 2 * (1 - uu) * uu * c1.y + uu * uu * e.y };
+      glowDot(q.x, q.y, 14 * (1 - uu) + 3, Math.sin(u * Math.PI) * .6, COL[e.hue]); }
+    glowDot(e.x, e.y, 26, .35, COL[e.hue]);
+  });
+  // keep the top-left dark for a title
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "source-over";
+  const tl = g.createRadialGradient(0, 0, 0, 0, 0, W * .6); tl.addColorStop(0, "rgba(11,13,18,.9)"); tl.addColorStop(1, "rgba(11,13,18,0)");
+  g.fillStyle = tl; g.fillRect(0, 0, W, H);
+}
+const STRANDS = Array.from({ length: 22 }, () => ({ sx: W * (.35 + rnd() * .3) + (rnd() - .5) * W * .2, sy: rnd() < .5 ? -40 - rnd() * H * .2 : H + 40 + rnd() * H * .2, hue: rnd() < .5 ? "violet" : "cyan", al: .12 + rnd() * .3, ph: rnd(), bend: (rnd() - .5) * .8 }));
+function converge(t) { // many paths resolve into one line
+  const ph = (t / T) * TAU; base(ph);
+  const P = { x: W * .62, y: H * .5 + Math.sin(ph) * 4 };
+  let rg = g.createRadialGradient(P.x, P.y, 0, P.x, P.y, W * .5); rg.addColorStop(0, "rgba(255,204,128,.08)"); rg.addColorStop(.4, "rgba(155,140,255,.07)"); rg.addColorStop(1, "rgba(11,13,18,0)");
+  g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = "lighter";
+  for (const s of STRANDS) {
+    const cx = (s.sx + P.x) / 2 + s.bend * 200, cy = (s.sy + P.y) / 2;
+    const lg = g.createLinearGradient(s.sx, s.sy, P.x, P.y); lg.addColorStop(0, rgba(COL[s.hue], 0)); lg.addColorStop(1, rgba(COL[s.hue], s.al));
+    g.strokeStyle = lg; g.lineWidth = .9; g.beginPath(); g.moveTo(s.sx, s.sy); g.quadraticCurveTo(cx, cy, P.x, P.y); g.stroke();
+    const u = ((t / T) + s.ph) % 1, uu = u * u;
+    const q = { x: (1 - uu) * (1 - uu) * s.sx + 2 * (1 - uu) * uu * cx + uu * uu * P.x, y: (1 - uu) * (1 - uu) * s.sy + 2 * (1 - uu) * uu * cy + uu * uu * P.y };
+    glowDot(q.x, q.y, 8, Math.sin(u * Math.PI) * s.al * 1.5, COL[s.hue]);
+  }
+  // the one line forward, warm white
+  const ln = g.createLinearGradient(P.x, 0, W, 0); ln.addColorStop(0, "rgba(255,240,220,.9)"); ln.addColorStop(1, "rgba(255,204,128,.15)");
+  g.fillStyle = ln; g.fillRect(P.x, P.y - 1, W - P.x, 2);
+  g.globalAlpha = .3; g.fillRect(P.x, P.y - 7, W - P.x, 14); g.globalAlpha = 1;
+  for (let k = 0; k < 3; k++) { const u = ((t / T) * 2 + k / 3) % 1; glowDot(P.x + u * (W - P.x), P.y, 18, Math.sin(u * Math.PI) * .7, [255, 214, 160]); }
+  glowDot(P.x, P.y, 110, .85, [255, 220, 180]); g.fillStyle = "#fff"; g.beginPath(); g.arc(P.x, P.y, 3.4, 0, TAU); g.fill();
+  leftDark();
+}
+const SCENES = { field: frame, branch, threshold, horizon, converge };
+window.renderFrame = (i, fps) => { g.setTransform(1, 0, 0, 1, 0, 0); SCENES[SCENE]((i / fps) % T); return c.toDataURL("image/png"); };
+window.T = T;
+</script></body></html>

@@ -1,0 +1,98 @@
+/* Motion and effects. Each one answers something: the person, the scroll, or a state change. */
+@layer fx {
+/* ---------- View Transitions: screens and states morph instead of swapping ---------- */
+::view-transition-group(*) { animation-duration: 480ms; animation-timing-function: var(--ease-out); }
+::view-transition-old(root) { animation: 200ms var(--ease-out) both vt-fade-out; }
+::view-transition-new(root) { animation: 260ms var(--ease-out) both vt-fade-in; }
+:root[data-vt="route"]::view-transition-old(root) { animation: 760ms var(--ease-out) both drop-under; }
+:root[data-vt="route"]::view-transition-new(root) { animation: 760ms var(--ease-out) both drop-in; }
+::view-transition-old(hdr), ::view-transition-new(hdr), ::view-transition-old(tabbar), ::view-transition-new(tabbar) { animation: none; }
+@keyframes vt-fade-out { to { opacity: 0; } }
+@keyframes vt-fade-in { from { opacity: 0; } }
+@keyframes vt-out { to { opacity: 0; transform: translateY(-8px); } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(14px); } }
+
+/* reduced motion: instant, opacity-only */
+:root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after { animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+:root[data-motion="reduce"] .cinema img, :root[data-motion="reduce"] .cinema video { opacity: 1; }
+
+@media print {
+  body::before, .hdr, .tabbar, .brief-tools, .toasts, .skip, .scene .cinema, .cinema-toggle { display: none !important; }
+  :root { --ink: #fff; --surface: #fff; --text: #111; --text-2: #444; --line: #ddd; --line-2: #ccc; }
+  body { background: #fff; color: #111; }
+  .view { padding: 0; }
+}
+
+/* ---------- the mark ---------- */
+.bm { display: block; overflow: visible; }
+.bm-axis { stroke: var(--text); stroke-opacity: .25; }
+.bm-pt { fill: var(--text); }
+.bm-down { opacity: .35; }
+.bm-ring { opacity: .9; }
+:root[data-motion="full"] .bm-ring, :root[data-motion="full"] .bm-up, :root[data-motion="full"] .bm-axis { stroke-dasharray: 1; stroke-dashoffset: 1; animation: bm-draw 1.4s var(--ease-out) forwards; }
+:root[data-motion="full"] .bm-axis { animation-duration: .9s; animation-delay: .1s; }
+:root[data-motion="full"] .bm-up { animation-delay: .35s; }
+:root[data-motion="full"] .bm-up2 { animation-delay: .5s; }
+:root[data-motion="full"] .bm-down { opacity: 0; animation: bm-reflect 1s var(--ease-out) .9s forwards; }
+:root[data-motion="full"] .bm-glow { transform-origin: 16px 32px; animation: bm-breathe 4.2s ease-in-out 1.2s infinite; }
+:root[data-motion="full"] .bm-pt { transform-origin: 16px 32px; animation: bm-pop .6s var(--spring) .15s both; }
+@keyframes bm-draw { to { stroke-dashoffset: 0; } }
+@keyframes bm-reflect { to { opacity: .35; } }
+@keyframes bm-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.45); opacity: .55; } }
+@keyframes bm-pop { from { transform: scale(0); } }
+/* hover: the futures branch again */
+:root[data-motion="full"] .brand:hover .bm-up, :root[data-motion="full"] .foot-brand:hover .bm-up { animation: bm-redraw .9s var(--ease-out); }
+:root[data-motion="full"] .brand:hover .bm-up2, :root[data-motion="full"] .foot-brand:hover .bm-up2 { animation-delay: .12s; animation-fill-mode: backwards; }
+.bm-ring { transform: rotate(180deg); transform-origin: 32px 32px; transition: transform 1.1s var(--ease-out); }
+:root[data-motion="full"] .brand:hover .bm-ring, :root[data-motion="full"] .foot-brand:hover .bm-ring { transform: rotate(360deg); transition-timing-function: var(--spring); }
+@keyframes bm-redraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+
+/* ---------- drop: a new screen spreads out like liquid from where you clicked ---------- */
+@keyframes drop-in { from { clip-path: circle(0 at var(--dx, 50%) var(--dy, 50%)); } to { clip-path: circle(150vmax at var(--dx, 50%) var(--dy, 50%)); } }
+@keyframes drop-under { to { opacity: .4; transform: scale(.985); filter: brightness(.7); } }
+:root[data-vt="lang"]::view-transition-old(root) { animation: 300ms var(--ease-out) both vt-fade-out; }
+:root[data-vt="lang"]::view-transition-new(root) { animation: 520ms var(--ease-out) both vt-in; }
+
+/* ---------- buttons fill like liquid from where the pointer came in, and the big ones lean toward it ---------- */
+.btn { position: relative; isolation: isolate; overflow: hidden; transition: translate .45s var(--spring), background-color var(--d2) var(--ease-out), border-color var(--d2) var(--ease-out), color var(--d2) var(--ease-out); }
+.btn::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--text); clip-path: circle(0 at var(--fx, 50%) var(--fy, 50%)); transition: clip-path .55s var(--ease-out); }
+.btn:not(.btn-primary):not(.btn-quiet):not(.btn-ghost):not(.btn-danger):hover { color: var(--ink); border-color: var(--text); background: transparent; }
+.btn:not(.btn-primary):not(.btn-quiet):not(.btn-ghost):not(.btn-danger):hover::before { clip-path: circle(150% at var(--fx, 50%) var(--fy, 50%)); }
+.btn-primary::before { background: var(--silver); }
+.btn-primary:hover { transform: none; }
+.btn-primary:hover::before { clip-path: circle(150% at var(--fx, 50%) var(--fy, 50%)); }
+:root[data-theme="light"] .btn-primary::before { background: #3A4048; }
+:root[data-theme="light"] .btn-primary:hover { color: #F2F4F7; }
+.btn:active:not(:disabled) { scale: .97; transition: scale .1s; }
+
+/* ---------- the FAQ opens with real height ---------- */
+:root { interpolate-size: allow-keywords; }
+.faq details::details-content { height: 0; overflow: clip; transition: height .5s var(--ease-out), content-visibility .5s allow-discrete; }
+.faq details[open]::details-content { height: auto; }
+
+/* ---------- a future that loses its footing cracks ---------- */
+.cracking { animation: crack-shake .42s var(--ease-out); }
+.cracking .crack-svg path { stroke-dasharray: 1; animation: crack-draw .6s var(--ease-out) both; }
+@keyframes crack-shake { 20% { translate: -3px 0; } 40% { translate: 3px 0; } 60% { translate: -2px 0; } 80% { translate: 1px 0; } }
+@keyframes crack-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+/* ---------- the header steps aside while you read down, and returns when you scroll up ---------- */
+.hdr { transition: translate .45s var(--ease-out), background-color var(--d3) var(--ease-out), border-color var(--d3) var(--ease-out); }
+.hdr.away { translate: 0 calc(-100% - 2px); }
+
+/* ---------- the hero settles in once ---------- */
+.hero-title .lw { display: inline-block; animation: settle 1.2s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms + 80ms); }
+.hero-aside > * { animation: settle 1s var(--ease-out) both; }
+.hero-aside > :nth-child(1) { animation-delay: .45s; } .hero-aside > :nth-child(2) { animation-delay: .55s; } .hero-aside > :nth-child(3) { animation-delay: .65s; }
+@keyframes settle { from { opacity: 0; translate: 0 .35em; filter: blur(6px); } }
+.hero canvas.liquid { animation: pool-in 1.6s var(--ease-out) .2s both; }
+@keyframes pool-in { from { opacity: 0; } }
+
+/* ---------- reduced motion: everything above is instant or absent ---------- */
+:root[data-motion="reduce"] .btn::before { display: none; }
+:root[data-motion="reduce"] .btn:not(.btn-primary):not(.btn-quiet):not(.btn-ghost):not(.btn-danger):hover { color: var(--text); background: color-mix(in oklab, var(--surface-2) 70%, transparent); }
+:root[data-motion="reduce"] .hdr.away { translate: none; }
+:root[data-motion="reduce"] .faq details::details-content { transition: none; }
+
+}

@@ -1,0 +1,40 @@
+/* reset, type, layout primitives */
+@layer base {
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { background: var(--ink); -webkit-text-size-adjust: 100%; }
+body { margin: 0; min-height: 100dvh; background: var(--ink); color: var(--text); font: 400 var(--t-md)/1.6 var(--sans); -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
+h1, h2, h3, h4, p, ul, ol, figure, dl, dd { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+img, video, svg { display: block; max-width: 100%; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+::selection { background: var(--text); color: var(--ink); }
+.sr { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.skip { position: absolute; left: 12px; top: -60px; z-index: 200; padding: 10px 14px; background: var(--text); color: var(--ink); border-radius: var(--r); font-weight: 600; }
+.skip:focus { top: 12px; }
+.wrap { width: var(--wrap); margin-inline: auto; }
+.ic { display: inline-grid; place-items: center; flex: none; }
+
+/* ---------- type ---------- */
+.eyebrow, .label { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font: 500 12.5px/1.4 var(--sans); letter-spacing: 0; color: var(--text-2); }
+.title, .display { font: 700 clamp(2.6rem, 1.5rem + 4.4vw, 5.8rem)/1.02 var(--display); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; }
+.title-2, .h1 { font: 700 clamp(1.9rem, 1.3rem + 2vw, 3rem)/1.06 var(--display); letter-spacing: -.03em; text-wrap: balance; }
+.h2 { font: 700 clamp(1.4rem, 1.15rem + .9vw, 1.85rem)/1.12 var(--display); letter-spacing: -.02em; }
+.h3 { font: 600 var(--t-lg)/1.35 var(--sans); letter-spacing: -.01em; }
+.muted { color: var(--text-2); } .faint { color: var(--text-3); }
+.small { font-size: var(--t-sm); } .xs { font-size: var(--t-xs); }
+.lead { font-size: var(--t-lg); line-height: 1.55; color: var(--text-2); max-width: 54ch; text-wrap: pretty; }
+.num { font-variant-numeric: tabular-nums; }
+.stack > * + * { margin-top: var(--s4); }
+.row { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.between { justify-content: space-between; }
+.grow { flex: 1; min-width: 0; }
+
+/* sections are separated by rules and space, not boxes */
+.panel { border-top: 1px solid var(--line-2); padding-top: var(--s5); }
+.pad { padding-bottom: var(--s5); }
+.rule { height: 1px; background: var(--line); border: 0; margin: var(--s5) 0; }
+
+}
